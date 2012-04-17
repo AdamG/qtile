@@ -8,5 +8,6 @@ MANIFEST
 /dist
 # Vim swap files
 *.swp
+*.swo
 /doc
 .DS_Store

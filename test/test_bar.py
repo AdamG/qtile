@@ -51,88 +51,80 @@ class GBConfig:
     ]
     main = None
 
+class uPromptCompletion(libpry.AutoTree):
+    def test_completion(self):
+        c = libqtile.widget.prompt.CommandCompleter(None, True)
+        c.reset()
+        c.lookup = [
+            ("a", "x/a"),
+            ("aa", "x/aa"),
+        ]
+        assert c.complete("a") == "a"
+        assert c.actual() == "x/a"
+        assert c.complete("a") == "aa"
+        assert c.complete("a") == "a"
 
-def test_completion():
-    c = libqtile.widget.prompt.CommandCompleter(None, True)
-    c.reset()
-    c.lookup = [
-        ("a", "x/a"),
-        ("aa", "x/aa"),
-    ]
-    assert c.complete("a") == "a"
-    assert c.actual() == "x/a"
-    assert c.complete("a") == "aa"
-    assert c.complete("a") == "a"
+        c = libqtile.widget.prompt.CommandCompleter(None)
+        r = c.complete("l")
+        assert c.actual().endswith(r)
 
-    c = libqtile.widget.prompt.CommandCompleter(None)
-    r = c.complete("l")
-    assert c.actual().endswith(r)
+        c.reset()
+        assert c.complete("/bi") == "/bin/"
+        c.reset()
+        assert c.complete("/bin") != "/bin/"
+        c.reset()
+        assert c.complete("~") != "~"
 
-    c.reset()
-    assert c.complete("/bi") == "/bin/"
-    c.reset()
-    assert c.complete("/bin") != "/bin/"
-    c.reset()
-    assert c.complete("~") != "~"
-
-    c.reset()
-    s = "thisisatotallynonexistantpathforsure"
-    assert c.complete(s) == s
-    assert c.actual() == s
-
-
-@Xephyr(True, GBConfig())
-def test_draw(self):
-    self.testWindow("one")
-    b = self.c.bar["bottom"].info()
-    assert b["widgets"][0]["name"] == "GroupBox"
+        c.reset()
+        s = "thisisatotallynonexistantpathforsure"
+        assert c.complete(s) == s
+        assert c.actual() == s
 
 
-@Xephyr(True, GBConfig())
-def test_prompt(self):
-    assert self.c.widget["prompt"].info()["width"] == 0
-    self.c.spawncmd(":")
-    self.c.widget["prompt"].fake_keypress("a")
-    self.c.widget["prompt"].fake_keypress("Tab")
+class uWidgets(utils.QtileTests):
+    config = GBConfig()
+    def test_draw(self):
+        self.testWindow("one")
+        b = self.c.bar["bottom"].info()
+        assert b["widgets"][0]["name"] == "GroupBox"
 
-    self.c.spawncmd(":")
-    self.c.widget["prompt"].fake_keypress("slash")
-    self.c.widget["prompt"].fake_keypress("Tab")
+    def test_prompt(self):
+        assert self.c.widget["prompt"].info()["width"] == 0
+        self.c.spawncmd(":")
+        self.c.widget["prompt"].fake_keypress("a")
+        self.c.widget["prompt"].fake_keypress("Tab")
 
+        self.c.spawncmd(":")
+        self.c.widget["prompt"].fake_keypress("slash")
+        self.c.widget["prompt"].fake_keypress("Tab")
 
-@Xephyr(True, GBConfig())
-def test_event(self):
-    self.c.group["bb"].toscreen()
+    def test_event(self):
+        self.c.group["bb"].toscreen()
+        self.c.log()
 
+    def test_textbox(self):
+        assert "text" in self.c.list_widgets()
+        s = "some text"
+        self.c.widget["text"].update(s)
+        assert self.c.widget["text"].get() == s
+        s = "Aye, much longer string than the initial one"
+        self.c.widget["text"].update(s)
+        assert self.c.widget["text"].get() == s
+        self.c.group["Pppy"].toscreen()
+        self.c.widget["text"].set_font(fontsize=12)
+        time.sleep(3)
 
-@Xephyr(True, GBConfig())
-def test_textbox(self):
-    assert "text" in self.c.list_widgets()
-    s = "some text"
-    self.c.widget["text"].update(s)
-    assert self.c.widget["text"].get() == s
-    s = "Aye, much longer string than the initial one"
-    self.c.widget["text"].update(s)
-    assert self.c.widget["text"].get() == s
-    self.c.group["Pppy"].toscreen()
-    self.c.widget["text"].set_font(fontsize=12)
-    time.sleep(3)
+    def test_textbox_errors(self):
+        self.c.widget["text"].update(None)
+        self.c.widget["text"].update("".join(chr(i) for i in range(255)))
+        self.c.widget["text"].update("V\xE2r\xE2na\xE7\xEE")
+        self.c.widget["text"].update(u"\ua000")
 
-
-@Xephyr(True, GBConfig())
-def test_textbox_errors(self):
-    self.c.widget["text"].update(None)
-    self.c.widget["text"].update("".join(chr(i) for i in range(255)))
-    self.c.widget["text"].update("V\xE2r\xE2na\xE7\xEE")
-    self.c.widget["text"].update(u"\ua000")
-
-
-@Xephyr(True, GBConfig())
-def test_groupbox_click(self):
-    self.c.group["ccc"].toscreen()
-    assert self.c.groups()["a"]["screen"] == None
-    self.c.bar["bottom"].fake_click(0, "bottom", 10, 10, 1)
-    assert self.c.groups()["a"]["screen"] == 0
+    def test_groupbox_click(self):
+        self.c.group["ccc"].toscreen()
+        assert self.c.groups()["a"]["screen"] == None
+        self.c.bar["bottom"].fake_click(0, "bottom", 10, 10, 1)
+        assert self.c.groups()["a"]["screen"] == 0
 
 
 class GeomConf:
@@ -237,17 +229,31 @@ def test_resize(self):
     assert off(l) == [0, 10, 90]
 
 
-class ErrConf(GeomConf):
+class TopBottomConf(GeomConf):
     screens = [
         libqtile.manager.Screen(left=libqtile.bar.Bar([], 10))
     ]
 
+class MultiStretchConf(GeomConf):
+    screens = [
+        libqtile.manager.Screen(top=libqtile.bar.Bar([
+          libqtile.widget.TextBox(txt, width=libqtile.bar.STRETCH)
+          for txt in ["text1", "text2"]
+        ], 10))
+    ]
 
+<<<<<<< HEAD
 @Xephyr(True, ErrConf(), False)
 def test_err(self):
     config = ErrConf()
     self.qtileRaises(libqtile.confreader.ConfigError, config)
 
+=======
+class uBarErr(utils._QtileTruss):
+    def test_err(self):
+        self.qtileRaises("top or the bottom of the screen", TopBottomConf())
+        self.qtileRaises("Only one STRETCH widget allowed!", MultiStretchConf())
+>>>>>>> qtile/master
 
 class TestWidget(libqtile.widget.base._Widget):
     def __init__(self):
