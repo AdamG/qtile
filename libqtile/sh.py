@@ -20,15 +20,9 @@
 """
     A command shell for Qtile.
 """
-import readline
-import sys
-import pprint
-import re
-import textwrap
-import fcntl
-import termios
-import struct
-import command
+import readline, sys, pprint, re, textwrap
+import fcntl, termios, struct
+import command, ipc
 
 
 def terminalWidth():
@@ -230,12 +224,12 @@ class QSh:
     do_quit = do_exit
     do_q = do_exit
 
-    def _call(self, cmd, args):
+    def _call(self, cmd_name, args):
         cmds = self._commands()
-        if cmd not in cmds:
-            return "No such command: %s" % cmd
+        if cmd_name not in cmds:
+            return "No such command: %s"%cmd_name
 
-        cmd = getattr(self.current, cmd)
+        cmd = getattr(self.current, cmd_name)
         if args:
             args = "".join(args)
         else:
@@ -250,7 +244,14 @@ class QSh:
         except SyntaxError, v:
             return "Syntax error in expression: %s" % v.text
         except command.CommandException, val:
-            return "Command exception: %s\n" % val
+            return "Command exception: %s\n"%val
+        except ipc.IPCError:
+            # on restart, try to reconnect
+            if cmd_name == 'restart':
+                client = command.Client(self.clientroot.client.fname)
+                self.clientroot, self.current = client, client
+            else:
+                raise
 
     def loop(self):
         while True:
