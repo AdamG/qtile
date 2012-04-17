@@ -1,4 +1,4 @@
-from base import Layout
+from base import Layout, SingleWindow
 from .. import utils, manager
 
 
@@ -209,3 +209,156 @@ class Tile(Layout):
     def cmd_increase_nmaster(self):
         self.master += 1
         self.group.layoutAll()
+
+
+
+class VTile(SingleWindow):
+    """
+        A simple layout that only displays one window at a time, filling the
+        screen. This is suitable for use on laptops and other devices with
+        small screens. Conceptually, the windows are managed as a stack, with
+        commands to switch to next and previous windows in the stack.
+    """
+    defaults = manager.Defaults(
+        ("name", "max", "Name of this layout."),
+    )
+
+    def __init__(self, **config):
+        SingleWindow.__init__(self, **config)
+        self.clients = []
+        self.ratio = 0.84
+
+    def _get_window(self):
+        if self.clients:
+            return self.clients[0]
+
+    def up(self):
+        if self.clients:
+            utils.shuffleUp(self.clients)
+            self.group.layoutAll()
+            self.group.focus(self.clients[0], False)
+
+    def down(self):
+        if self.clients:
+            utils.shuffleDown(self.clients)
+            self.group.layoutAll()
+            self.group.focus(self.clients[0], False)
+
+    def clone(self, group):
+        c = SingleWindow.clone(self, group)
+        c.clients = []
+        return c
+
+    def add(self, c):
+        self.clients.insert(0, c)
+
+    def remove(self, c):
+        self.clients.remove(c)
+        if self.clients:
+            return self.clients[0]
+
+    def configure(self, c, screen):
+        self._tile_vconfigure(c, screen)
+        # try:
+        #     self._tile_configure(c, screen)
+        # except Exception:
+        #     self._max_configure(c, screen)
+
+    def _max_configure(self, c, screen):
+        if self.clients and c is self.clients[0]:
+            c.place(
+                screen.x,
+                screen.y,
+                screen.width,
+                screen.height,
+                0,
+                None
+            )
+            c.unhide()
+        else:
+            c.hide()
+
+    def _tile_configure(self, c, screen):
+        screenWidth = screen.width
+        screenHeight = screen.height
+        x = y = w = h = 0
+        if self.clients and c in self.clients:
+            pos = self.clients.index(c)
+            if c is self.clients[0]:
+                if len(self.clients) == 1:
+                    w = screenWidth
+                else:
+                    w = int(screenWidth * self.ratio)
+                h = screenHeight
+                x = screen.x
+                y = screen.y + pos * h
+            else:
+                w = screenWidth - int(screenWidth * self.ratio)
+                h = screenHeight / (len(self.clients) - 1)
+                x = screen.x + int(screenWidth * self.ratio)
+                y = screen.y + self.clients[1:].index(c) * h
+            c.place(
+                x,
+                y,
+                w,
+                h,
+                0,
+                None,
+                )
+            c.unhide()
+        else:
+            c.hide()
+
+    def _tile_vconfigure(self, c, screen):
+        screenWidth = screen.width
+        screenHeight = screen.height
+        x = y = w = h = 0
+        if self.clients and c in self.clients:
+            pos = self.clients.index(c)
+            if c is self.clients[0]:
+                w = screenWidth
+                if len(self.clients) == 1:
+                    h = screenHeight
+                else:
+                    h = int(screenHeight * self.ratio)
+                x = screen.x + pos * w
+                y = screen.y
+            else:
+                w = screenWidth / (len(self.clients) - 1)
+                h = screenHeight - int(screenHeight * self.ratio)
+                y = screen.y + int(screenHeight * self.ratio)
+                x = screen.x + self.clients[1:].index(c) * w
+            c.place(
+                x,
+                y,
+                w,
+                h,
+                0,
+                None,
+                )
+            c.unhide()
+        else:
+            c.hide()
+
+
+
+    def info(self):
+        d = SingleWindow.info(self)
+        d["clients"] = [i.name for i in self.clients]
+        return d
+
+    def cmd_down(self):
+        """
+            Switch down in the window list.
+        """
+        self.down()
+
+    cmd_next = cmd_down
+
+    def cmd_up(self):
+        """
+            Switch up in the window list.
+        """
+        self.up()
+
+    cmd_previous = cmd_up
